@@ -28,7 +28,6 @@ def tweaklldp(output_temp_file):
             print interface + " connected to " +interfaces[interface]["neighbor_mac"]
 
 def tweakipint(output_temp_file):
-    print "inside"
     int1='unassigned'
     int2=''
     int3=''
