@@ -88,9 +88,11 @@ def truncate_command_output(command_to_truncate,tech_file_number):
             command_output = gettempoutput(tech_file_number, command)
             if command == "show lldp neighbors":
                 TweakOutput.tweaklldp(command_output)
+                exit()
             if command == "show ip interface":
                 TweakOutput.tweakipint(command_output)
-        exit()
+                exit()
+    
     print "Cannot truncate this command's output. Displaying complete output"
     return
 
@@ -178,7 +180,7 @@ def gettempoutput(tech_file_number, command):
         :return: Temporary file object with output of 'command'
         """
         temp_file=tempfile.NamedTemporaryFile()
-        command="python /Users/christie/Documents/PycharmProjects/untitled/FileChar.py " + str(tech_file_number) + " " + command
+        command="python /Users/upasana/Documents/Upasana/Software/TechParser/FileChar.py " + str(tech_file_number) + " " + command
         proc = subprocess.Popen([command], stdout=subprocess.PIPE, shell=True)
         (output, err) = proc.communicate()
         temp_file.write(str(output))

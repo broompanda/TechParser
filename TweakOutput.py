@@ -28,7 +28,36 @@ def tweaklldp(output_temp_file):
             print interface + " connected to " +interfaces[interface]["neighbor_mac"]
 
 def tweakipint(output_temp_file):
-    pass
+    print "inside"
+    int1='unassigned'
+    int2=''
+    int3=''
+
+
+    print "%-20s%-25s%-25s%-20s%-20s" % ("Interface","IP Address","Status","Protocol","MTU")
+   
+    for line in output_temp_file.readlines():
+        line=line.rstrip() #output as seen exactly in show interfaces
+        interface_ip=re.findall(".*Internet address.*",line)
+        if len(interface_ip)!=0:
+            int1=interface_ip[0].split(" ")[5] #IP address
+     
+      
+        interface_name=re.findall(".*line.*\s+",line)
+        if len(interface_name)!=0:
+            
+            int2=re.findall('(\S*) is (.*), line protocol is ([\S]*)',line) 
+      
+        
+
+        interface_mtu=re.findall(".*IP MTU.*",line)
+        if len(interface_mtu)!=0:
+            int3=interface_mtu[0].split(" ")[4] #MTU
+      
+        if len(interface_mtu)>0:
+            print "%-20s%-25s%-25s%-20s%-20s" % (int2[0][0],int1,int2[0][1],int2[0][2],int3)
+            int1='unassigned'
+      
 
 def main():
     tweaklldp()
