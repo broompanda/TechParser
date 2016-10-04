@@ -2,6 +2,9 @@ import linecache
 import TrackFile2
 from optparse import OptionParser
 import os
+import tempfile
+import subprocess
+import TweakOutput
 
 """This class object parses the show-tech file for show commands and indexes them.
 It also defines method for parsing the show-tech file for a specific command.
@@ -71,65 +74,116 @@ class FileChar(object):
                 exit()
 
 def find_better_search(search_text):
-    swap_commands = {"show ip route":"show ip route detail"}
+    swap_commands = {"show ip route":"show ip route detail", "show interface":"show interfaces --"}
     print search_text
     if search_text in swap_commands:
         return swap_commands[search_text]
     else:
         return search_text
 
-def format_output():
-    pass
+def truncate_command_output(command_to_truncate,tech_file_number):
+    reducible_commands=["show lldp neighbors", "show ip interface"]
+    for command in reducible_commands:
+        if command_to_truncate in command:
+            command_output = gettempoutput(tech_file_number, command)
+            if command == "show lldp neighbors":
+                TweakOutput.tweaklldp(command_output)
+            if command == "show ip interface":
+                TweakOutput.tweakipint(command_output)
+        exit()
+    print "Cannot truncate this command's output. Displaying complete output"
+    return
 
-def get_show(list_similar, print_all, args, opts):
+
+def get_show(args, opts):
     """ Takes the search string entered as arguments to the function call, creates a polished search string, parses
      the show-tech for the corresponding terms and displays the output.
 
     :return:Calls the print_between function to display the required output.
     """
-    search_text = ""
-    tf = TrackFile2.TrackFile()
-    if len(args)>=1:
-        if args[0].isdigit():
-            tech_file_number = int(args[0])
-            file_name = tf.get_tech_file(tech_file_number)  # Gets show-tech file corresponding to the file-number.
-        else:
-            print "The show-tech file number entered is incorrect"
-            exit()
-        if file_name == -1:
-            print "Tech-support not found for file number: " + str(tech_file_number)
-            exit()
-        elif os.path.exists(file_name.rstrip()):
-            trs = FileChar(file_name)
-            if print_all:
-                command = "cat "+str(file_name)
-                os.system(command )
-                exit()
-            elif (len(args) > 1):  # Check if there are at least 2 arguments. sys.argv considers function call as 1 argument.
-                for x in args[1:]:
-                    word = swap_terms(x)  # Replace shortened terms with the expanded words.
-                    search_text = search_text + " " + word
-                search_text = find_better_search(search_text.strip())
-                if list_similar:
-                    search_text=trs.find_similar_commands(search_text)
-                search_text_index = trs.find_output_indexes(search_text)
-                if search_text_index != -1:
-                    start_index = search_text_index
-                    stop_index = trs.show_index[trs.show_index.index(search_text_index) + 1]
-                    trs.print_between(start_index, stop_index)
-                else:
-                    print "No match found for '" +str(search_text) + "'"
-        else:
-            print "The show-tech " + file_name + " does not exist"
-            exit()
+    if not opts.show_differences:
 
+        search_text = ""
+        tf = TrackFile2.TrackFile()
+        if len(args)>=1:
+            if args[0].isdigit():
+                tech_file_number = int(args[0])
+                file_name = tf.get_tech_file(tech_file_number)  # Gets show-tech file corresponding to the file-number.
+            else:
+                print "The show-tech file number entered is incorrect"
+                exit()
+            if file_name == -1:
+                print "Tech-support not found for file number: " + str(tech_file_number)
+                exit()
+            elif os.path.exists(file_name.rstrip()):
+                trs = FileChar(file_name)
+                if opts.print_all:
+                    command = "cat "+str(file_name)
+                    os.system(command )
+                    exit()
+                elif (len(args) > 1):  # Check if there are at least 2 arguments. sys.argv considers function call as 1 argument.
+                    for x in args[1:]:
+                        word = swap_terms(x)  # Replace shortened terms with the expanded words.
+                        search_text = search_text + " " + word
+                    search_text = find_better_search(search_text.strip())
+                    if opts.list_similar:
+                        search_text=trs.find_similar_commands(search_text)
+                    search_text_index = trs.find_output_indexes(search_text)
+                    if opts.show_brief:
+                        truncate_command_output(search_text, tech_file_number)
+                    if search_text_index != -1:
+                        start_index = search_text_index
+                        stop_index = trs.show_index[trs.show_index.index(search_text_index) + 1]
+                        trs.print_between(start_index, stop_index)
+                    else:
+                        print "No match found for '" +str(search_text) + "'"
+
+            else:
+                print "The show-tech " + file_name + " does not exist"
+                exit()
+
+        else:
+            print "The number of arguments if invalid. Please try again"
+            exit()
     else:
-        print "The number of arguments if invalid. Please try again"
-        exit()
+        find_differences(args)
 
 # Add shortened search terms to the end of the dictionary to customize the tool as per your favorite search patterns
 swap_words = {"sh": "show", "sho": "show", "int": "interface", "br": "brief", "ro": "route", "ver": "version",
               "nei": "neighbor"}
+
+def find_differences(args):
+    if len(args)>=1:
+        file_numbers=args[0].split(',')
+    first_tech_file_number=file_numbers[0]
+    second_tech_file_number=file_numbers[1]
+    common_command=""
+    for word in args[1:]:
+        common_command=common_command + " " + word
+    try:
+        file1=gettempoutput(first_tech_file_number, common_command)
+        file2=gettempoutput(second_tech_file_number, common_command)
+        vim_command="vimdiff " + file1.name + " " + file2.name
+        os.system(vim_command)
+    finally:
+        # Automatically cleans up the file
+        file1.close()
+        file2.close()
+
+
+def gettempoutput(tech_file_number, command):
+        """
+        :param tech_file_number: Show tech file number where command needs to be executed
+        :param command: Command to be executed
+        :return: Temporary file object with output of 'command'
+        """
+        temp_file=tempfile.NamedTemporaryFile()
+        command="python /Users/christie/Documents/PycharmProjects/untitled/FileChar.py " + str(tech_file_number) + " " + command
+        proc = subprocess.Popen([command], stdout=subprocess.PIPE, shell=True)
+        (output, err) = proc.communicate()
+        temp_file.write(str(output))
+        temp_file.seek(0)
+        return temp_file
 
 
 
@@ -151,7 +205,10 @@ def main():
     parser=OptionParser(usage="usage: %prog [flags] file_number search_string", description= desc,
                           version="%prog 1.0")
 
-    list_desc = "List all possible commands containing the search terms. Usage: gt -l file_number search_string"
+    list_desc = "List all possible commands containing the search terms. Usage: gt -l <file_number> <search_string>"
+    diff_desc = "Shows the difference between outputs for the same command across 2 different show-tech files. Usage: gt -d <file_number1>,<file_number2> <search_string>"
+    cat_desc =  "Prints entire show-tech file. Usage: gt -c <file_number1>"
+    brief_desc = "Print brief format of selected output, if available"
     parser.add_option("-l", "--list",
                       action="store_true",
                       dest="list_similar",
@@ -162,18 +219,24 @@ def main():
                       action="store_true",
                       dest="print_all",
                       default=False,
-                      help="Prints entire show-tech file. Any other flag used with this option will be invalid.")
+                      help=cat_desc)
 
-    parser.add_option("-d", "--dummy",
+    parser.add_option("-d", "--diff",
                       action="store_true",
-                      dest="test",
+                      dest="show_differences",
                       default=False,
-                      help="Print entire file")
+                      help=diff_desc)
+
+    parser.add_option("-b", "--brief",
+                      action="store_true",
+                      dest="show_brief",
+                      default=False,
+                      help=brief_desc)
 
 
     (opts,args) = parser.parse_args()
 
-    get_show(opts.list_similar, opts.print_all, args, opts)
+    get_show(args, opts)
 
 
 if __name__ == "__main__":
