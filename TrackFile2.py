@@ -7,7 +7,6 @@ class TrackFile(object):
     def __init__(self):
         program_dir = os.path.dirname(os.path.abspath(__file__))
         self.tracking_file_name = os.path.join(program_dir,"test_shelf")
-        #self.tracking_file_name = "/Users/christie/Documents/PycharmProjects/untitled/test_shelf"
 
     def add_tech_file(self, tech_file_number, tech_file_name):
         s = shelve.open(self.tracking_file_name, flag='c', writeback=True)

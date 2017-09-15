@@ -3,6 +3,7 @@ __author__ = 'christie'
 import sys
 import re
 
+
 def tweaklldp(output_temp_file):
     interfaces={}
     for line in (output_temp_file).readlines():
@@ -16,16 +17,16 @@ def tweaklldp(output_temp_file):
             if len(neighbor_name)>0:
                 interfaces[int]["neighbor_name"] = neighbor_name[0]
             else:
-                neighbor_info=re.findall('.*Neighbor (\S+), age',line)
+                neighbor_info=re.findall('.*Neighbor (.+), age',line)
                 if len(neighbor_info)>0:
                     interfaces[int]["neighbor_mac"] = neighbor_info[0]
+
     interface_names = interfaces.keys()
     interface_names.sort()
     for interface in interface_names:
-        if len(interfaces[interface])>1:
-            print interface + " connected to " +interfaces[interface]["neighbor_mac"] + ". Device name:  " +interfaces[interface]["neighbor_name"]
-        else:
-            print interface + " connected to " +interfaces[interface]["neighbor_mac"]
+        #print interface + " connected to " +interfaces[interface].get("neighbor_mac","MAC_Unknown") + ". Device name:  " +interfaces[interface].get("neighbor_name","Neighbor_name_unknown")
+        print "%-17s%-15s%-35s%-20s%-20s" % (interface,"connected to",interfaces[interface].get("neighbor_mac","MAC_Unknown")," Device name:  ",interfaces[interface].get("neighbor_name","Neighbor_name_unknown"))
+
 
 def tweakipint(output_temp_file):
     int1='unassigned'
@@ -58,8 +59,30 @@ def tweakipint(output_temp_file):
             int1='unassigned'
       
 
+def tweakmroute(group,source,flag):
+  test=0
+  test1=0
+  group_section=0
+  with open('ipmroute') as f:
+    lines = f.readlines()
+  for line in lines:
+    line=line.rstrip()
+    if group in line:
+      test=1
+    if test==1 and flag==0:
+      if len(re.findall("\s+", line)) == 0 and group not in line:
+        break
+      print line
+    elif flag==1:
+        if source in line:
+          test1=1
+        if test1==1:
+          if len(re.findall(".*flags.*", line)) == 1 and source not in line:
+            break
+          print line
+
 def main():
-    tweaklldp()
+  tweakmroute('224.0.5.223','159.125.70.194',1)
 
 if __name__ == "__main__":
     main()

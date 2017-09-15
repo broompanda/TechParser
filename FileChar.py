@@ -5,6 +5,7 @@ import os
 import tempfile
 import subprocess
 import TweakOutput
+import filterplatformcounters
 
 """This class object parses the show-tech file for show commands and indexes them.
 It also defines method for parsing the show-tech file for a specific command.
@@ -56,6 +57,7 @@ class FileChar(object):
         :param search_text:String to be searched in the show-tech file. Ex: "show run"
         :return:
         """
+
         similar_commands={}
         disp_count=1
         for line in self.show_index_lines:
@@ -123,7 +125,8 @@ def get_show(args, opts):
                     command = "cat "+str(file_name)
                     os.system(command )
                     exit()
-                elif (len(args) > 1):  # Check if there are at least 2 arguments. sys.argv considers function call as 1 argument.
+
+                elif (len(args) > 0):  # Check if there are at least 2 arguments. sys.argv considers function call as 1 argument.
                     for x in args[1:]:
                         word = swap_terms(x)  # Replace shortened terms with the expanded words.
                         search_text = search_text + " " + word
@@ -133,6 +136,8 @@ def get_show(args, opts):
                     search_text_index = trs.find_output_indexes(search_text)
                     if opts.show_brief:
                         truncate_command_output(search_text, tech_file_number)
+                    if opts.analyze_tech_support:
+                        analyze_tech_support(tech_file_number)
                     if search_text_index != -1:
                         start_index = search_text_index
                         stop_index = trs.show_index[trs.show_index.index(search_text_index) + 1]
@@ -180,7 +185,8 @@ def gettempoutput(tech_file_number, command):
         :return: Temporary file object with output of 'command'
         """
         temp_file=tempfile.NamedTemporaryFile()
-        command="python /Users/upasana/Documents/Upasana/Software/TechParser/FileChar.py " + str(tech_file_number) + " " + command
+        command="python  " + __file__ + " " +  str(tech_file_number) + " " + command
+        print command
         proc = subprocess.Popen([command], stdout=subprocess.PIPE, shell=True)
         (output, err) = proc.communicate()
         temp_file.write(str(output))
@@ -188,6 +194,28 @@ def gettempoutput(tech_file_number, command):
         return temp_file
 
 
+def analyze_tech_support(tech_file_number):
+    print ("""What would like to analyze in the tech-support?
+    1. Platform fap counters
+    2. Platform interrupts""")
+    selection=raw_input("Please Select: ")
+
+    if selection == '1':
+        analyze_platform_fap(tech_file_number)
+    elif selection == '2':
+        analyze_platform_interrupts(tech_file_number)
+    else:
+        exit()
+
+def analyze_platform_fap(tech_file_number):
+
+    clock_output = gettempoutput(tech_file_number, "show clock")
+    platform_cnt_output = gettempoutput(tech_file_number, "'show platform fap counters | nz'")
+    filterplatformcounters.filter(platform_cnt_output.name, clock_output.name)
+    exit()
+
+def analyze_platform_interrupts(tech_file_number):
+    pass
 
 def swap_terms(word):
     """
@@ -203,14 +231,16 @@ def swap_terms(word):
 
 def main():
 
-    desc ="Tool to parse show-tech files"
-    parser=OptionParser(usage="usage: %prog [flags] file_number search_string", description= desc,
+
+    tool_desc ="Tool to parse show-tech files"
+    parser=OptionParser(usage="usage: %prog [flags] file_number search_string", description= tool_desc,
                           version="%prog 1.0")
 
     list_desc = "List all possible commands containing the search terms. Usage: gt -l <file_number> <search_string>"
     diff_desc = "Shows the difference between outputs for the same command across 2 different show-tech files. Usage: gt -d <file_number1>,<file_number2> <search_string>"
     cat_desc =  "Prints entire show-tech file. Usage: gt -c <file_number1>"
     brief_desc = "Print brief format of selected output, if available"
+    analyze_desc="Analyze the show-tech"
     parser.add_option("-l", "--list",
                       action="store_true",
                       dest="list_similar",
@@ -234,6 +264,12 @@ def main():
                       dest="show_brief",
                       default=False,
                       help=brief_desc)
+
+    parser.add_option("-a", "--analyze",
+                      action="store_true",
+                      dest="analyze_tech_support",
+                      default=False,
+                      help=analyze_desc)
 
 
     (opts,args) = parser.parse_args()
